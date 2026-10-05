@@ -5,3 +5,9 @@
 .phpunit.result.cache
 /status.md
 /docs/arbeitszeit.md
+
+# Lokale Arbeitsdateien, nie veröffentlichen
+/CLAUDE.md
+/handoff.md
+/docs/
+/tools/
