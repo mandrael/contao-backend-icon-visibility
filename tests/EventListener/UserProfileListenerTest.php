@@ -18,6 +18,8 @@ use Doctrine\DBAL\Connection;
 use Mandrael\ContaoBackendIconVisibilityBundle\EventListener\UserProfileListener;
 use Mandrael\ContaoBackendIconVisibilityBundle\Tests\FrameworkMockTrait;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 class UserProfileListenerTest extends TestCase
 {
@@ -38,7 +40,7 @@ class UserProfileListenerTest extends TestCase
             'fields' => ['iconVisibilityOwn' => ['exclude' => false]],
         ];
 
-        $this->listener(null)->lockIfNotAllowed();
+        $this->listener(null)->applyPermission();
 
         $dca = $GLOBALS['TL_DCA']['tl_user'];
 
@@ -54,9 +56,10 @@ class UserProfileListenerTest extends TestCase
     {
         $GLOBALS['TL_DCA']['tl_user']['palettes'] = ['login' => self::PALETTE];
 
-        $this->listener(null, $this->user(7, true))->lockIfNotAllowed();
+        $this->listener(null, $this->user(7, true))->applyPermission();
 
         $this->assertSame(['login' => self::PALETTE], $GLOBALS['TL_DCA']['tl_user']['palettes']);
+        $this->assertFalse($GLOBALS['TL_DCA']['tl_user']['fields']['iconVisibilityShow']['exclude']);
     }
 
     public function testPrefillsANewSelectionWithTheSettings(): void
@@ -103,7 +106,10 @@ class UserProfileListenerTest extends TestCase
     {
         $connection ??= $this->createStub(Connection::class);
 
-        return new UserProfileListener($this->mockFramework($config), $this->visibility([], $user, $connection), $this->mockSecurity($user), $connection);
+        $requestStack = new RequestStack();
+        $requestStack->push(new Request(['do' => 'login']));
+
+        return new UserProfileListener($this->mockFramework($config), $this->visibility([], $user, $connection), $this->mockSecurity($user), $connection, $requestStack);
     }
 
     /**

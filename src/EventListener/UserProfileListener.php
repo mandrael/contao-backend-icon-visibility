@@ -19,6 +19,7 @@ use Contao\CoreBundle\Framework\ContaoFramework;
 use Contao\DataContainer;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * The own selection in the user profile: locked unless a user group allows it,
@@ -35,17 +36,27 @@ class UserProfileListener
         private readonly OperationVisibilityListener $visibility,
         private readonly Security $security,
         private readonly Connection $connection,
+        private readonly RequestStack $requestStack,
     ) {
     }
 
     #[AsCallback('tl_user', 'config.onload')]
-    public function lockIfNotAllowed(): void
+    public function applyPermission(): void
     {
+        $dca = &$GLOBALS['TL_DCA']['tl_user'];
+
         if ($this->allowedUser()) {
+            // Contao only unlocks the fields of the "login" palette on the
+            // profile page, not those of the subpalette. Elsewhere (e.g. when
+            // editing multiple users) the fields stay excluded.
+            if ('login' === $this->requestStack->getCurrentRequest()?->query->get('do')) {
+                foreach (self::SELECTION_FIELDS as $field) {
+                    $dca['fields'][$field]['exclude'] = false;
+                }
+            }
+
             return;
         }
-
-        $dca = &$GLOBALS['TL_DCA']['tl_user'];
 
         // Contao copies the "login" palette to "default" on the profile page.
         foreach (['login', 'default'] as $palette) {

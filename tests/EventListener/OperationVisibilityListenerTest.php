@@ -137,7 +137,12 @@ class OperationVisibilityListenerTest extends TestCase
         $user = $this->user(['iconVisibilityOwn' => true, 'iconVisibilityShow' => ['page:cut'], 'groups' => [3]]);
 
         $connection = $this->createMock(Connection::class);
-        $connection->expects($this->once())->method('fetchOne')->willReturn(1);
+        $connection
+            ->expects($this->once())
+            ->method('fetchOne')
+            ->with($this->logicalAnd($this->stringContains('disable = 0'), $this->stringContains("start = '' OR start <= :time"), $this->stringContains('stop > :time')))
+            ->willReturn(1)
+        ;
 
         $listener = $this->visibility(['iconVisibilityAll' => '1'], $user, $connection);
         $listener('tl_page');
