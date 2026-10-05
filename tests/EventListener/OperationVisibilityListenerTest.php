@@ -118,6 +118,7 @@ class OperationVisibilityListenerTest extends TestCase
         $listener('tl_news');
 
         $this->assertTrue($GLOBALS['TL_DCA']['tl_page']['list']['operations']['new']['primary']);
+        $this->assertTrue($GLOBALS['TL_DCA']['tl_page']['list']['operations']['new'][OperationVisibilityListener::NEW_MARKER]);
 
         // A parent view sorted by date has no "new after" buttons.
         $this->assertArrayNotHasKey('new', $GLOBALS['TL_DCA']['tl_news']['list']['operations']);

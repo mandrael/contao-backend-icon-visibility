@@ -40,6 +40,11 @@ class OperationsBuilderPass implements CompilerPassInterface
 
     public static function isCompatible(): bool
     {
+        // The class is internal to Contao and may be renamed in a future version.
+        if (!class_exists(DataContainerOperationsBuilder::class)) {
+            return false;
+        }
+
         $class = new \ReflectionClass(DataContainerOperationsBuilder::class);
 
         if ($class->isFinal() || !$class->hasMethod('addNewButton')) {
@@ -53,10 +58,10 @@ class OperationsBuilderPass implements CompilerPassInterface
         }
 
         $signature = array_map(
-            static fn (\ReflectionParameter $parameter): string => $parameter->getName().':'.$parameter->getType(),
+            static fn (\ReflectionParameter $parameter): string => ($parameter->isPassedByReference() ? '&' : '').$parameter->getName().':'.$parameter->getType().($parameter->isOptional() ? '=' : ''),
             $method->getParameters(),
         );
 
-        return ['mode:string', 'table:string', 'pid:int', 'id:?int'] === $signature && \in_array((string) $method->getReturnType(), ['self', DataContainerOperationsBuilder::class], true);
+        return ['mode:string', 'table:string', 'pid:int', 'id:?int='] === $signature && \in_array((string) $method->getReturnType(), ['self', DataContainerOperationsBuilder::class], true);
     }
 }

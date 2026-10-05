@@ -45,6 +45,21 @@ class OperationsBuilderTest extends TestCase
         $this->assertSame('App\CustomBuilder', $container->getDefinition(OperationsBuilderPass::SERVICE)->getClass());
     }
 
+    public function testUsesTheOwnIconsOnlyForButtonsMadePrimaryByTheBundle(): void
+    {
+        $marked = ['primary' => true, 'iconVisibilityMarked' => true];
+
+        $this->assertSame(OperationsBuilder::ICONS['after'], OperationsBuilder::iconFor($marked, 'after'));
+        $this->assertSame(OperationsBuilder::ICONS['into'], OperationsBuilder::iconFor($marked, 'into'));
+        $this->assertNull(OperationsBuilder::iconFor($marked, 'paste'));
+
+        // Primary by another extension, an icon of its own, not primary, no operation.
+        $this->assertNull(OperationsBuilder::iconFor(['primary' => true], 'after'));
+        $this->assertNull(OperationsBuilder::iconFor([...$marked, 'icon' => 'custom.svg'], 'after'));
+        $this->assertNull(OperationsBuilder::iconFor(['iconVisibilityMarked' => true], 'after'));
+        $this->assertNull(OperationsBuilder::iconFor(null, 'after'));
+    }
+
     public function testTheIconsExist(): void
     {
         foreach (OperationsBuilder::ICONS as $path) {

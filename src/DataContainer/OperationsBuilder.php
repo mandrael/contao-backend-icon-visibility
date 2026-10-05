@@ -13,11 +13,12 @@ declare(strict_types=1);
 namespace Mandrael\ContaoBackendIconVisibilityBundle\DataContainer;
 
 use Contao\CoreBundle\DataContainer\DataContainerOperationsBuilder;
+use Mandrael\ContaoBackendIconVisibilityBundle\EventListener\OperationVisibilityListener;
 
 /**
  * Contao shows "new after" and "new into" with the same icon, which is
  * ambiguous once both stand in the row. This builder gives them distinct icons
- * if the bundle made them primary and the DCA does not define its own icon.
+ * if this bundle made them primary and the DCA does not define its own icon.
  *
  * Replaces Contao's internal operations builder only if its signature matches
  * (see OperationsBuilderPass); otherwise Contao's icon remains.
@@ -31,18 +32,40 @@ class OperationsBuilder extends DataContainerOperationsBuilder
 
     public function addNewButton(string $mode, string $table, int $pid, int|null $id = null): DataContainerOperationsBuilder
     {
-        $new = $GLOBALS['TL_DCA'][$table]['list']['operations']['new'] ?? null;
+        $icon = self::iconFor($GLOBALS['TL_DCA'][$table]['list']['operations']['new'] ?? null, $mode);
 
-        if (!isset(self::ICONS[$mode]) || !\is_array($new) || !($new['primary'] ?? false) || isset($new['icon'])) {
+        if (null === $icon) {
             return parent::addNewButton($mode, $table, $pid, $id);
         }
 
-        $GLOBALS['TL_DCA'][$table]['list']['operations']['new']['icon'] = self::ICONS[$mode];
+        $operation = &$GLOBALS['TL_DCA'][$table]['list']['operations']['new'];
+        $hadIcon = \array_key_exists('icon', $operation);
+
+        // Unset first, so a reference stored under "icon" is not overwritten.
+        unset($operation['icon']);
+        $operation['icon'] = $icon;
 
         try {
             return parent::addNewButton($mode, $table, $pid, $id);
         } finally {
-            unset($GLOBALS['TL_DCA'][$table]['list']['operations']['new']['icon']);
+            unset($operation['icon']);
+
+            if ($hadIcon) {
+                $operation['icon'] = null;
+            }
         }
+    }
+
+    /**
+     * The own icon if this bundle made the buttons primary and the DCA does
+     * not define an icon itself.
+     */
+    public static function iconFor(mixed $new, string $mode): string|null
+    {
+        if (!\is_array($new) || !($new[OperationVisibilityListener::NEW_MARKER] ?? false) || !($new['primary'] ?? false) || isset($new['icon'])) {
+            return null;
+        }
+
+        return self::ICONS[$mode] ?? null;
     }
 }

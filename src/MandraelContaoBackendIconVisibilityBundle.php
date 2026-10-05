@@ -19,14 +19,6 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 
 class MandraelContaoBackendIconVisibilityBundle extends AbstractBundle
 {
-    /**
-     * The bundle root, so public/ (icons) and contao/ are found next to src/.
-     */
-    public function getPath(): string
-    {
-        return \dirname(__DIR__);
-    }
-
     public function build(ContainerBuilder $container): void
     {
         $container->addCompilerPass(new OperationsBuilderPass());

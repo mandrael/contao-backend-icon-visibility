@@ -80,6 +80,12 @@ class OperationVisibilityListener implements ResetInterface
     public const NEW = 'new';
 
     /**
+     * Set on list.operations.new when this bundle made the buttons primary, so
+     * they get distinct icons (see DataContainer\OperationsBuilder).
+     */
+    public const NEW_MARKER = 'iconVisibilityMarked';
+
+    /**
      * Operations Contao itself marks as primary, per table (always visible).
      *
      * @var array<string, list<string>>
@@ -255,6 +261,7 @@ class OperationVisibilityListener implements ResetInterface
 
         if (null === $new || \is_array($new)) {
             $GLOBALS['TL_DCA'][$table]['list']['operations'][self::NEW]['primary'] = true;
+            $GLOBALS['TL_DCA'][$table]['list']['operations'][self::NEW][self::NEW_MARKER] = true;
         }
     }
 
