@@ -12,7 +12,10 @@ declare(strict_types=1);
 
 namespace Mandrael\ContaoBackendIconVisibilityBundle\Tests\EventListener;
 
+use Contao\BackendUser;
 use Contao\DataContainer;
+use Contao\DC_Folder;
+use Doctrine\DBAL\Connection;
 use Mandrael\ContaoBackendIconVisibilityBundle\EventListener\OperationVisibilityListener;
 use Mandrael\ContaoBackendIconVisibilityBundle\Tests\FrameworkMockTrait;
 use PHPUnit\Framework\TestCase;
@@ -49,45 +52,67 @@ class OperationVisibilityListenerTest extends TestCase
     {
         $before = $GLOBALS['TL_DCA'];
 
-        (new OperationVisibilityListener($this->mockFramework()))('tl_page');
+        ($this->visibility())('tl_page');
 
         $this->assertSame($before, $GLOBALS['TL_DCA']);
     }
 
-    public function testCombinesTheGeneralAndTheAreaSelection(): void
+    public function testCombinesAllListsAndTheArea(): void
     {
-        $listener = new OperationVisibilityListener($this->mockFramework([
-            'iconVisibilityDefault' => serialize(['show']),
-            'iconVisibilityPage' => serialize(['articles', 'copy']),
-        ]));
+        $listener = $this->visibility(['iconVisibilityShow' => serialize(['all:show', 'page:articles', 'page:copy', 'news:cut'])]);
 
         $listener('tl_page');
         $listener('tl_news');
 
         $this->assertSame(['edit', 'copy', 'show', 'articles'], $this->primary('tl_page'));
-        $this->assertSame(['edit', 'show'], $this->primary('tl_news'));
+        $this->assertSame(['edit', 'cut', 'show'], $this->primary('tl_news'));
+    }
+
+    public function testTheMenuSelectionWins(): void
+    {
+        $listener = $this->visibility([
+            'iconVisibilityShow' => serialize(['all:show', 'all:copy']),
+            'iconVisibilityMenu' => serialize(['news:show', 'all:copy']),
+        ]);
+
+        $listener('tl_page');
+        $listener('tl_news');
+
+        $this->assertSame(['edit', 'show'], $this->primary('tl_page'));
+        $this->assertSame(['edit'], $this->primary('tl_news'));
+    }
+
+    public function testShowsAllOperationsExceptTheMenuSelection(): void
+    {
+        $listener = $this->visibility([
+            'iconVisibilityAll' => '1',
+            'iconVisibilityMenu' => serialize(['news:cut', 'page:new']),
+        ]);
+
+        $listener('tl_page');
+        $listener('tl_news');
+
+        $this->assertSame(['edit', 'copy', 'cut', 'show', 'articles'], $this->primary('tl_page'));
+        $this->assertArrayNotHasKey('new', $GLOBALS['TL_DCA']['tl_page']['list']['operations']);
+        $this->assertSame(['edit', 'copy', 'show', 'articles'], $this->primary('tl_news'));
+        $this->assertFalse($GLOBALS['TL_DCA']['tl_page']['list']['lazyLoadOperations']);
     }
 
     public function testIgnoresOperationsThatDoNotExistAndKeepsSeparators(): void
     {
-        $listener = new OperationVisibilityListener($this->mockFramework([
-            'iconVisibilityDefault' => serialize(['versions', 'copyChildren']),
-        ]));
-
-        $listener('tl_page');
+        ($this->visibility(['iconVisibilityShow' => serialize(['all:versions', 'all:copyChildren', 'broken', 'page:'])]))('tl_page');
 
         $operations = $GLOBALS['TL_DCA']['tl_page']['list']['operations'];
 
         $this->assertArrayNotHasKey('versions', $operations);
         $this->assertArrayNotHasKey('copyChildren', $operations);
         $this->assertSame('-', $operations[0]);
+        $this->assertSame(['edit'], $this->primary('tl_page'));
     }
 
     public function testMarksTheNewButtonsOnlyWhereContaoRendersThem(): void
     {
-        $listener = new OperationVisibilityListener($this->mockFramework([
-            'iconVisibilityDefault' => serialize(['new']),
-        ]));
+        $listener = $this->visibility(['iconVisibilityShow' => serialize(['all:new'])]);
 
         $listener('tl_page');
         $listener('tl_news');
@@ -104,41 +129,80 @@ class OperationVisibilityListenerTest extends TestCase
         $this->assertTrue(OperationVisibilityListener::hasNewButtons(['list' => ['sorting' => ['mode' => DataContainer::MODE_PARENT, 'fields' => ['sorting']]]]));
         $this->assertFalse(OperationVisibilityListener::hasNewButtons(['list' => ['sorting' => ['mode' => DataContainer::MODE_SORTABLE]]]));
         $this->assertFalse(OperationVisibilityListener::hasNewButtons(['config' => ['closed' => true], 'list' => ['sorting' => ['mode' => DataContainer::MODE_TREE]]]));
-        $this->assertFalse(OperationVisibilityListener::hasNewButtons(['config' => ['dataContainer' => \Contao\DC_Folder::class], 'list' => ['sorting' => ['mode' => DataContainer::MODE_TREE]]]));
+        $this->assertFalse(OperationVisibilityListener::hasNewButtons(['config' => ['dataContainer' => DC_Folder::class], 'list' => ['sorting' => ['mode' => DataContainer::MODE_TREE]]]));
     }
 
-    public function testShowsAllOperationsAndDisablesLazyLoading(): void
+    public function testUsesTheOwnSelectionOfAnAllowedUser(): void
     {
-        $listener = new OperationVisibilityListener($this->mockFramework([
-            'iconVisibilityAll' => '1',
-            'iconVisibilityDefault' => serialize(['show']),
-        ]));
+        $user = $this->user(['iconVisibilityOwn' => true, 'iconVisibilityShow' => ['page:cut'], 'groups' => [3]]);
 
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())->method('fetchOne')->willReturn(1);
+
+        $listener = $this->visibility(['iconVisibilityAll' => '1'], $user, $connection);
         $listener('tl_page');
         $listener('tl_news');
 
-        $this->assertSame(['edit', 'copy', 'cut', 'show', 'articles', 'new'], $this->primary('tl_page'));
-        $this->assertSame(['edit', 'copy', 'cut', 'show', 'articles'], $this->primary('tl_news'));
-        $this->assertFalse($GLOBALS['TL_DCA']['tl_page']['list']['lazyLoadOperations']);
+        // The own selection replaces the settings ("show all" is not inherited).
+        $this->assertSame(['edit', 'cut'], $this->primary('tl_page'));
+        $this->assertSame(['edit'], $this->primary('tl_news'));
+    }
+
+    public function testFallsBackToTheSettingsIfTheUserIsNotAllowed(): void
+    {
+        $user = $this->user(['iconVisibilityOwn' => true, 'iconVisibilityShow' => ['page:cut'], 'groups' => [3]]);
+
+        $connection = $this->createStub(Connection::class);
+        $connection->method('fetchOne')->willReturn(0);
+
+        ($this->visibility(['iconVisibilityShow' => serialize(['all:show'])], $user, $connection))('tl_page');
+
+        $this->assertSame(['edit', 'show'], $this->primary('tl_page'));
+    }
+
+    public function testAdministratorsAndOnlyAllowedGroupsMayUseAnOwnSelection(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->never())->method('fetchOne');
+
+        $listener = $this->visibility([], null, $connection);
+
+        $this->assertTrue($listener->allowsOwnSelection($this->user(['isAdmin' => true])));
+        $this->assertFalse($listener->allowsOwnSelection($this->user(['groups' => []])));
     }
 
     public function testRemembersTheOperationsContaoMarksAsPrimary(): void
     {
-        $listener = new OperationVisibilityListener($this->mockFramework(['iconVisibilityAll' => '1']));
+        $listener = $this->visibility(['iconVisibilityAll' => '1']);
 
         $listener('tl_page');
 
         $this->assertSame(['edit'], $listener->getNativePrimary('tl_page'));
         $this->assertSame([], $listener->getNativePrimary('tl_unknown'));
+
+        $listener->reset();
+
+        $this->assertSame([], $listener->getNativePrimary('tl_page'));
     }
 
     public function testIgnoresTablesWithoutOperations(): void
     {
         $GLOBALS['TL_DCA']['tl_settings'] = ['config' => []];
 
-        (new OperationVisibilityListener($this->mockFramework(['iconVisibilityAll' => '1'])))('tl_settings');
+        ($this->visibility(['iconVisibilityAll' => '1']))('tl_settings');
 
         $this->assertSame(['config' => []], $GLOBALS['TL_DCA']['tl_settings']);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function user(array $data): BackendUser
+    {
+        $user = $this->createStub(BackendUser::class);
+        $user->method('__get')->willReturnCallback(static fn (string $key): mixed => $data[$key] ?? null);
+
+        return $user;
     }
 
     /**

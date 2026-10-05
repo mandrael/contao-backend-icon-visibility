@@ -17,24 +17,23 @@ use PHPUnit\Framework\TestCase;
 
 class LanguageFilesTest extends TestCase
 {
-    public function testAllLanguagesDefineTheSameLabels(): void
+    public function testAllLanguagesDefineTheSameNonEmptyTexts(): void
     {
         $de = $this->load('de');
+        $en = $this->load('en');
 
-        $this->assertSame(array_keys($de), array_keys($this->load('en')));
+        $this->assertSame($this->keys($de), $this->keys($en));
 
-        $expected = [OperationVisibilityListener::FIELD_ALL, OperationVisibilityListener::FIELD_DEFAULT, ...array_keys(OperationVisibilityListener::AREAS)];
-
-        foreach (['de' => $de, 'en' => $this->load('en')] as $language => $labels) {
-            foreach ($expected as $field) {
-                $this->assertCount(2, $labels[$field] ?? [], "$language: label for $field is missing");
-
-                foreach ($labels[$field] as $text) {
-                    $this->assertNotSame('', trim($text), "$language: empty text for $field");
-                }
+        foreach (['de' => $de, 'en' => $en] as $language => $lang) {
+            foreach ([OperationVisibilityListener::FIELD_ALL, OperationVisibilityListener::FIELD_SHOW, OperationVisibilityListener::FIELD_MENU] as $field) {
+                $this->assertCount(2, $lang['MSC'][$field] ?? [], "$language: label for $field is missing");
             }
 
-            $this->assertNotSame('', trim($labels['iconVisibilityNewOption']), "$language: empty option label");
+            $this->assertCount(2, $lang['tl_user'][OperationVisibilityListener::FIELD_OWN] ?? [], "$language: profile label is missing");
+            $this->assertCount(2, $lang['tl_user_group'][OperationVisibilityListener::FIELD_ALLOW_OWN] ?? [], "$language: group label is missing");
+            $this->assertSame([OperationVisibilityListener::ALL_LISTS, ...array_keys(OperationVisibilityListener::AREAS)], array_keys($lang['MSC']['iconVisibilityAreas']));
+
+            array_walk_recursive($lang, fn (string $text, int|string $key) => $this->assertNotSame('', trim($text), "$language: empty text for $key"));
         }
     }
 
@@ -44,10 +43,34 @@ class LanguageFilesTest extends TestCase
     private function load(string $language): array
     {
         $GLOBALS['TL_LANG'] = [];
-        require \dirname(__DIR__).'/contao/languages/'.$language.'/tl_settings.php';
-        $labels = $GLOBALS['TL_LANG']['tl_settings'];
+
+        foreach (glob(\dirname(__DIR__).'/contao/languages/'.$language.'/*.php') ?: [] as $file) {
+            require $file;
+        }
+
+        $lang = $GLOBALS['TL_LANG'];
         unset($GLOBALS['TL_LANG']);
 
-        return $labels;
+        return $lang;
+    }
+
+    /**
+     * @param array<mixed> $lang
+     *
+     * @return list<string>
+     */
+    private function keys(array $lang, string $prefix = ''): array
+    {
+        $keys = [];
+
+        foreach ($lang as $key => $value) {
+            $keys[] = $prefix.$key;
+
+            if (\is_array($value) && !array_is_list($value)) {
+                $keys = [...$keys, ...$this->keys($value, $prefix.$key.'.')];
+            }
+        }
+
+        return $keys;
     }
 }

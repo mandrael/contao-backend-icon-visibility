@@ -14,6 +14,10 @@ namespace Mandrael\ContaoBackendIconVisibilityBundle\Tests;
 
 use Contao\CoreBundle\Framework\Adapter;
 use Contao\CoreBundle\Framework\ContaoFramework;
+use Doctrine\DBAL\Connection;
+use Mandrael\ContaoBackendIconVisibilityBundle\EventListener\OperationVisibilityListener;
+use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\Security\Core\User\UserInterface;
 
 trait FrameworkMockTrait
 {
@@ -36,5 +40,25 @@ trait FrameworkMockTrait
         $framework->method('getAdapter')->willReturn($adapter);
 
         return $framework;
+    }
+
+    /**
+     * @param list<string> $grantedModules
+     */
+    private function mockSecurity(UserInterface|null $user = null, array $grantedModules = []): Security
+    {
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn($user);
+        $security->method('isGranted')->willReturnCallback(static fn (mixed $attribute, mixed $module = null): bool => \in_array($module, $grantedModules, true));
+
+        return $security;
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function visibility(array $config = [], UserInterface|null $user = null, Connection|null $connection = null): OperationVisibilityListener
+    {
+        return new OperationVisibilityListener($this->mockFramework($config), $this->mockSecurity($user), $connection ?? $this->createStub(Connection::class));
     }
 }

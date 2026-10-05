@@ -16,17 +16,17 @@ use Contao\DataContainer;
 use Contao\DC_Folder;
 use Contao\DC_Table;
 use Mandrael\ContaoBackendIconVisibilityBundle\EventListener\OperationVisibilityListener;
-use Mandrael\ContaoBackendIconVisibilityBundle\EventListener\SettingsOptionsListener;
+use Mandrael\ContaoBackendIconVisibilityBundle\EventListener\SelectionOptionsListener;
 use Mandrael\ContaoBackendIconVisibilityBundle\Tests\FrameworkMockTrait;
 use PHPUnit\Framework\TestCase;
 
-class SettingsOptionsListenerTest extends TestCase
+class SelectionOptionsListenerTest extends TestCase
 {
     use FrameworkMockTrait;
 
     private OperationVisibilityListener $visibility;
 
-    private SettingsOptionsListener $listener;
+    private SelectionOptionsListener $listener;
 
     protected function setUp(): void
     {
@@ -92,12 +92,13 @@ class SettingsOptionsListenerTest extends TestCase
             'DCA' => ['copy' => ['Duplicate', 'Duplicate ID %s'], 'show' => 'Details', 'cut' => ['Move', 'Move ID %s'], 'delete' => ['Delete', 'Delete ID %s']],
             'tl_page' => ['articles' => ['Articles', 'Edit the articles of page ID %s'], 'copy' => ['Copy page', 'Copy page ID %s']],
             'tl_content' => ['cut' => 'Move element ID %s'],
-            'tl_settings' => ['iconVisibilityNewOption' => 'New after/into'],
+            'MSC' => ['iconVisibilityNewOption' => 'New after/into', 'iconVisibilityAreas' => ['all' => 'In all lists', 'page' => 'Pages', 'files' => 'Files']],
         ];
 
-        $framework = $this->mockFramework();
-        $this->visibility = new OperationVisibilityListener($framework);
-        $this->listener = new SettingsOptionsListener($framework, $this->visibility);
+        $GLOBALS['BE_MOD'] = ['content' => ['page' => [], 'article' => [], 'news' => [], 'form' => [], 'files' => []], 'accounts' => ['member' => []]];
+
+        $this->visibility = $this->visibility();
+        $this->listener = new SelectionOptionsListener($this->mockFramework(), $this->visibility, $this->mockSecurity(null, ['page', 'article', 'news', 'form', 'files', 'member']));
 
         // Contao fires the hook while loading the DCA; the mocked loader does not.
         foreach (array_keys($GLOBALS['TL_DCA']) as $table) {
@@ -107,14 +108,14 @@ class SettingsOptionsListenerTest extends TestCase
 
     protected function tearDown(): void
     {
-        unset($GLOBALS['TL_DCA'], $GLOBALS['TL_LANG']);
+        unset($GLOBALS['TL_DCA'], $GLOBALS['TL_LANG'], $GLOBALS['BE_MOD']);
     }
 
     public function testOffersOnlyExistingOperationsThatAreNotAlwaysVisible(): void
     {
         $this->assertSame(
             ['copy' => 'Copy page', 'show' => 'Details', 'articles' => 'Articles', 'new' => 'New after/into'],
-            $this->listener->getOptionsForArea('iconVisibilityPage'),
+            $this->listener->getOptionsForArea('page'),
         );
     }
 
@@ -122,60 +123,59 @@ class SettingsOptionsListenerTest extends TestCase
     {
         $this->assertSame(
             ['copy' => 'Duplicate', 'delete' => 'Delete', 'cut' => 'Move', 'new' => 'New after/into'],
-            $this->listener->getOptionsForArea('iconVisibilityContent'),
+            $this->listener->getOptionsForArea('content'),
         );
-    }
-
-    public function testOffersNoNewButtonsInTheFileManager(): void
-    {
-        $this->assertSame(['copy' => 'Duplicate', 'show' => 'Details'], $this->listener->getOptionsForArea('iconVisibilityFiles'));
-    }
-
-    public function testReadsTheAreaFromTheDataContainer(): void
-    {
-        $dc = $this->createStub(DataContainer::class);
-        $dc->method('__get')->willReturnMap([['field', 'iconVisibilityFiles']]);
-
-        $this->assertSame(['copy' => 'Duplicate', 'show' => 'Details'], $this->listener->getAreaOptions($dc));
-        $this->assertSame([], $this->listener->getAreaOptions(null));
     }
 
     public function testOmitsMoveIfTheTableIsNotSortable(): void
     {
         $GLOBALS['TL_DCA']['tl_content']['config']['notSortable'] = true;
 
-        $this->assertArrayNotHasKey('cut', $this->listener->getOptionsForArea('iconVisibilityContent'));
+        $this->assertArrayNotHasKey('cut', $this->listener->getOptionsForArea('content'));
     }
 
-    public function testOffersNoNewButtonsInParentViewsSortedByDate(): void
+    public function testOffersNoNewButtonsInTheFileManagerOrInListsSortedByDate(): void
     {
-        $this->assertSame(['copy' => 'Duplicate', 'cut' => 'Move'], $this->listener->getOptionsForArea('iconVisibilityNews'));
+        $this->assertSame(['copy' => 'Duplicate', 'show' => 'Details'], $this->listener->getOptionsForArea('files'));
+        $this->assertSame(['copy' => 'Duplicate', 'cut' => 'Move'], $this->listener->getOptionsForArea('news'));
     }
 
     public function testCombinesTheTablesOfAnArea(): void
     {
         $this->assertSame(
             ['copy' => 'Duplicate', 'show' => 'Details', 'cut' => 'Move', 'new' => 'New after/into'],
-            $this->listener->getOptionsForArea('iconVisibilityForm'),
+            $this->listener->getOptionsForArea('form'),
         );
     }
 
     public function testUsesTheLabelDefinedOnTheOperation(): void
     {
-        $this->assertSame(['sendReceipt' => 'Send receipt'], $this->listener->getOptionsForArea('iconVisibilityMember'));
+        $this->assertSame(['sendReceipt' => 'Send receipt'], $this->listener->getOptionsForArea('member'));
     }
 
-    public function testSkipsAreasWhoseTableDoesNotExist(): void
+    public function testSkipsAreasThatAreNotInstalledOrNotAccessible(): void
     {
-        $this->assertSame([], $this->listener->getOptionsForArea('iconVisibilityEvents'));
-        $this->assertSame([], $this->listener->getOptionsForArea('unknownField'));
+        // The calendar module is not installed.
+        $this->assertSame([], $this->listener->getOptionsForArea('events'));
+
+        $listener = new SelectionOptionsListener($this->mockFramework(), $this->visibility, $this->mockSecurity(null, ['news']));
+
+        $this->assertSame([], $listener->getOptionsForArea('page'));
+        $this->assertSame([], $listener->getOptionsForArea('form'));
+
+        // Content elements are reachable through news as well.
+        $this->assertNotSame([], $listener->getOptionsForArea('content'));
     }
 
-    public function testDefaultOptionsFallBackToTheKey(): void
+    public function testGroupsTheOptionsByArea(): void
     {
+        $options = $this->listener->getOptions();
+
+        $this->assertSame(['In all lists', 'Pages', 'content', 'news', 'form', 'Files', 'member'], array_keys($options));
         $this->assertSame(
-            ['copy' => 'Duplicate', 'copyChildren' => 'copyChildren', 'cut' => 'Move', 'delete' => 'Delete', 'show' => 'Details', 'versions' => 'versions', 'new' => 'New after/into'],
-            $this->listener->getDefaultOptions(),
+            ['all:copy' => 'Duplicate', 'all:copyChildren' => 'copyChildren', 'all:cut' => 'Move', 'all:delete' => 'Delete', 'all:show' => 'Details', 'all:versions' => 'versions', 'all:new' => 'New after/into'],
+            $options['In all lists'],
         );
+        $this->assertSame(['files:copy' => 'Duplicate', 'files:show' => 'Details'], $options['Files']);
     }
 }
