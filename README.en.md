@@ -18,8 +18,8 @@ Without a selection the bundle changes nothing. The main icons that Contao alway
 
 ## Requirements
 
-- Contao 5.7 or 6.0
-- PHP 8.3 or later
+- Contao 5.7 with PHP 8.3 or later
+- Contao 6.0 with PHP 8.4 or later
 
 ## Installation
 

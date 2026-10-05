@@ -15,6 +15,8 @@ namespace Mandrael\ContaoBackendIconVisibilityBundle\EventListener;
 use Contao\Config;
 use Contao\CoreBundle\DependencyInjection\Attribute\AsHook;
 use Contao\CoreBundle\Framework\ContaoFramework;
+use Contao\DataContainer;
+use Contao\DC_Folder;
 use Contao\StringUtil;
 
 /**
@@ -118,8 +120,38 @@ class OperationVisibilityListener
         return $this->nativePrimary[$table] ?? [];
     }
 
+    /**
+     * Whether Contao renders "new after/into" buttons in the rows of this list
+     * (see DC_Table::generateTree() and DC_Table::parentView()).
+     *
+     * @param array<mixed> $dca
+     */
+    public static function hasNewButtons(array $dca): bool
+    {
+        $config = $dca['config'] ?? [];
+
+        if (
+            DC_Folder::class === ($config['dataContainer'] ?? null)
+            || ($config['closed'] ?? false)
+            || ($config['notCreatable'] ?? false)
+            || ($config['notEditable'] ?? false)
+        ) {
+            return false;
+        }
+
+        return match ($dca['list']['sorting']['mode'] ?? null) {
+            DataContainer::MODE_TREE, DataContainer::MODE_TREE_EXTENDED => true,
+            DataContainer::MODE_PARENT => 'sorting' === ($dca['list']['sorting']['fields'][0] ?? null),
+            default => false,
+        };
+    }
+
     private function markNew(string $table): void
     {
+        if (!self::hasNewButtons($GLOBALS['TL_DCA'][$table])) {
+            return;
+        }
+
         $new = $GLOBALS['TL_DCA'][$table]['list']['operations'][self::NEW] ?? null;
 
         if (null === $new || \is_array($new)) {

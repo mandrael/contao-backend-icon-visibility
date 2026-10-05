@@ -47,8 +47,36 @@ class SettingsOptionsListenerTest extends TestCase
             'tl_content' => [
                 'config' => ['dataContainer' => DC_Table::class, 'dynamicPtable' => true],
                 'list' => [
-                    'sorting' => ['mode' => DataContainer::MODE_PARENT],
+                    'sorting' => ['mode' => DataContainer::MODE_PARENT, 'fields' => ['sorting']],
                     'operations' => ['edit' => ['primary' => true], 'copy' => [], 'delete' => []],
+                ],
+            ],
+            'tl_news' => [
+                'config' => ['dataContainer' => DC_Table::class],
+                'list' => [
+                    'sorting' => ['mode' => DataContainer::MODE_PARENT, 'fields' => ['date DESC']],
+                    'operations' => ['edit' => ['primary' => true], 'copy' => [], 'cut' => []],
+                ],
+            ],
+            'tl_form' => [
+                'config' => ['dataContainer' => DC_Table::class],
+                'list' => [
+                    'sorting' => ['mode' => DataContainer::MODE_SORTABLE],
+                    'operations' => ['edit' => ['primary' => true], 'copy' => [], 'show' => []],
+                ],
+            ],
+            'tl_form_field' => [
+                'config' => ['dataContainer' => DC_Table::class],
+                'list' => [
+                    'sorting' => ['mode' => DataContainer::MODE_PARENT, 'fields' => ['sorting']],
+                    'operations' => ['edit' => ['primary' => true], 'copy' => [], 'cut' => []],
+                ],
+            ],
+            'tl_member' => [
+                'config' => ['dataContainer' => DC_Table::class],
+                'list' => [
+                    'sorting' => ['mode' => DataContainer::MODE_SORTABLE],
+                    'operations' => ['edit' => ['primary' => true], 'sendReceipt' => ['label' => ['Send receipt', 'Send the receipt of member ID %s']]],
                 ],
             ],
             'tl_files' => [
@@ -112,9 +140,34 @@ class SettingsOptionsListenerTest extends TestCase
         $this->assertSame([], $this->listener->getAreaOptions(null));
     }
 
+    public function testOmitsMoveIfTheTableIsNotSortable(): void
+    {
+        $GLOBALS['TL_DCA']['tl_content']['config']['notSortable'] = true;
+
+        $this->assertArrayNotHasKey('cut', $this->listener->getOptionsForArea('iconVisibilityContent'));
+    }
+
+    public function testOffersNoNewButtonsInParentViewsSortedByDate(): void
+    {
+        $this->assertSame(['copy' => 'Duplicate', 'cut' => 'Move'], $this->listener->getOptionsForArea('iconVisibilityNews'));
+    }
+
+    public function testCombinesTheTablesOfAnArea(): void
+    {
+        $this->assertSame(
+            ['copy' => 'Duplicate', 'show' => 'Details', 'cut' => 'Move', 'new' => 'New after/into'],
+            $this->listener->getOptionsForArea('iconVisibilityForm'),
+        );
+    }
+
+    public function testUsesTheLabelDefinedOnTheOperation(): void
+    {
+        $this->assertSame(['sendReceipt' => 'Send receipt'], $this->listener->getOptionsForArea('iconVisibilityMember'));
+    }
+
     public function testSkipsAreasWhoseTableDoesNotExist(): void
     {
-        $this->assertSame([], $this->listener->getOptionsForArea('iconVisibilityNews'));
+        $this->assertSame([], $this->listener->getOptionsForArea('iconVisibilityEvents'));
         $this->assertSame([], $this->listener->getOptionsForArea('unknownField'));
     }
 

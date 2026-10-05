@@ -18,8 +18,8 @@ Ohne Auswahl ändert das Bundle nichts. Die Hauptsymbole, die Contao selbst imme
 
 ## Voraussetzungen
 
-- Contao 5.7 oder 6.0
-- PHP 8.3 oder neuer
+- Contao 5.7 mit PHP 8.3 oder neuer
+- Contao 6.0 mit PHP 8.4 oder neuer
 
 ## Installation
 

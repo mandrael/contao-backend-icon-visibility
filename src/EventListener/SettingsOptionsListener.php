@@ -16,7 +16,6 @@ use Contao\Controller;
 use Contao\CoreBundle\DependencyInjection\Attribute\AsCallback;
 use Contao\CoreBundle\Framework\ContaoFramework;
 use Contao\DataContainer;
-use Contao\DC_Folder;
 use Contao\System;
 
 /**
@@ -29,15 +28,6 @@ class SettingsOptionsListener
      * Contao's standard operations that are not primary by default.
      */
     private const DEFAULT_OPTIONS = ['copy', 'copyChildren', 'cut', 'delete', 'show', 'versions', OperationVisibilityListener::NEW];
-
-    /**
-     * List modes in which Contao renders "new after/into" buttons per row.
-     */
-    private const NEW_BUTTON_MODES = [
-        DataContainer::MODE_PARENT,
-        DataContainer::MODE_TREE,
-        DataContainer::MODE_TREE_EXTENDED,
-    ];
 
     public function __construct(
         private readonly ContaoFramework $framework,
@@ -96,29 +86,27 @@ class SettingsOptionsListener
             }
 
             $native = $this->visibility->getNativePrimary($table);
-            $keys = [];
+            $operations = [];
 
             foreach ($dca['list']['operations'] ?? [] as $key => $operation) {
                 if (\is_array($operation) && OperationVisibilityListener::NEW !== $key) {
-                    $keys[] = (string) $key;
+                    $operations[(string) $key] = $operation;
                 }
             }
 
-            // The parent table (and therefore "move") is only set at runtime.
-            if (($dca['config']['dynamicPtable'] ?? false) && !\in_array('cut', $keys, true)) {
-                $keys[] = 'cut';
+            // The parent table (and therefore "move") is only set at runtime,
+            // so it is missing when the DCA is loaded in the system settings.
+            if (($dca['config']['dynamicPtable'] ?? false) && !($dca['config']['notSortable'] ?? false)) {
+                $operations['cut'] ??= [];
             }
 
-            if (
-                DC_Folder::class !== ($dca['config']['dataContainer'] ?? null)
-                && \in_array($dca['list']['sorting']['mode'] ?? null, self::NEW_BUTTON_MODES, true)
-            ) {
-                $keys[] = OperationVisibilityListener::NEW;
+            if (OperationVisibilityListener::hasNewButtons($dca)) {
+                $operations[OperationVisibilityListener::NEW] = [];
             }
 
-            foreach ($keys as $key) {
+            foreach ($operations as $key => $operation) {
                 if (!isset($options[$key]) && !\in_array($key, $native, true)) {
-                    $options[$key] = $this->label($table, $key);
+                    $options[$key] = $this->label($table, $key, $operation['label'] ?? null);
                 }
             }
         }
@@ -126,7 +114,7 @@ class SettingsOptionsListener
         return $options;
     }
 
-    private function label(string|null $table, string $key): string
+    private function label(string|null $table, string $key, mixed $operationLabel = null): string
     {
         if (OperationVisibilityListener::NEW === $key) {
             $candidates = [$GLOBALS['TL_LANG']['tl_settings']['iconVisibilityNewOption'] ?? null];
@@ -134,10 +122,13 @@ class SettingsOptionsListener
             $tableLabel = null !== $table ? $GLOBALS['TL_LANG'][$table][$key] ?? null : null;
             $dcaLabel = $GLOBALS['TL_LANG']['DCA'][$key] ?? null;
 
-            // Prefer the short labels; the long one is a title for a single record.
+            // Short labels first (a label defined on the operation wins, as in
+            // Contao), then the long ones, which are titles for a single record.
             $candidates = [
+                \is_array($operationLabel) ? $operationLabel[0] ?? null : null,
                 \is_array($tableLabel) ? $tableLabel[0] ?? null : null,
                 \is_array($dcaLabel) ? $dcaLabel[0] ?? null : $dcaLabel,
+                \is_array($operationLabel) ? $operationLabel[1] ?? null : $operationLabel,
                 \is_array($tableLabel) ? $tableLabel[1] ?? null : $tableLabel,
             ];
         }

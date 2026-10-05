@@ -25,8 +25,16 @@ class LanguageFilesTest extends TestCase
 
         $expected = [OperationVisibilityListener::FIELD_ALL, OperationVisibilityListener::FIELD_DEFAULT, ...array_keys(OperationVisibilityListener::AREAS)];
 
-        foreach ($expected as $field) {
-            $this->assertCount(2, $de[$field] ?? [], "Label for $field is missing");
+        foreach (['de' => $de, 'en' => $this->load('en')] as $language => $labels) {
+            foreach ($expected as $field) {
+                $this->assertCount(2, $labels[$field] ?? [], "$language: label for $field is missing");
+
+                foreach ($labels[$field] as $text) {
+                    $this->assertNotSame('', trim($text), "$language: empty text for $field");
+                }
+            }
+
+            $this->assertNotSame('', trim($labels['iconVisibilityNewOption']), "$language: empty option label");
         }
     }
 

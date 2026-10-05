@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Mandrael\ContaoBackendIconVisibilityBundle\Tests\EventListener;
 
+use Contao\DataContainer;
 use Mandrael\ContaoBackendIconVisibilityBundle\EventListener\OperationVisibilityListener;
 use Mandrael\ContaoBackendIconVisibilityBundle\Tests\FrameworkMockTrait;
 use PHPUnit\Framework\TestCase;
@@ -23,6 +24,9 @@ class OperationVisibilityListenerTest extends TestCase
     protected function setUp(): void
     {
         $GLOBALS['TL_DCA'] = [];
+
+        $GLOBALS['TL_DCA']['tl_page']['list']['sorting'] = ['mode' => DataContainer::MODE_TREE];
+        $GLOBALS['TL_DCA']['tl_news']['list']['sorting'] = ['mode' => DataContainer::MODE_PARENT, 'fields' => ['date DESC']];
 
         foreach (['tl_page', 'tl_news'] as $table) {
             $GLOBALS['TL_DCA'][$table]['list']['operations'] = [
@@ -79,16 +83,28 @@ class OperationVisibilityListenerTest extends TestCase
         $this->assertSame('-', $operations[0]);
     }
 
-    public function testMarksTheNewButtons(): void
+    public function testMarksTheNewButtonsOnlyWhereContaoRendersThem(): void
     {
         $listener = new OperationVisibilityListener($this->mockFramework([
-            'iconVisibilityPage' => serialize(['new']),
+            'iconVisibilityDefault' => serialize(['new']),
         ]));
 
         $listener('tl_page');
+        $listener('tl_news');
 
         $this->assertTrue($GLOBALS['TL_DCA']['tl_page']['list']['operations']['new']['primary']);
+
+        // A parent view sorted by date has no "new after" buttons.
         $this->assertArrayNotHasKey('new', $GLOBALS['TL_DCA']['tl_news']['list']['operations']);
+    }
+
+    public function testDetectsListsWithNewButtons(): void
+    {
+        $this->assertTrue(OperationVisibilityListener::hasNewButtons(['list' => ['sorting' => ['mode' => DataContainer::MODE_TREE_EXTENDED]]]));
+        $this->assertTrue(OperationVisibilityListener::hasNewButtons(['list' => ['sorting' => ['mode' => DataContainer::MODE_PARENT, 'fields' => ['sorting']]]]));
+        $this->assertFalse(OperationVisibilityListener::hasNewButtons(['list' => ['sorting' => ['mode' => DataContainer::MODE_SORTABLE]]]));
+        $this->assertFalse(OperationVisibilityListener::hasNewButtons(['config' => ['closed' => true], 'list' => ['sorting' => ['mode' => DataContainer::MODE_TREE]]]));
+        $this->assertFalse(OperationVisibilityListener::hasNewButtons(['config' => ['dataContainer' => \Contao\DC_Folder::class], 'list' => ['sorting' => ['mode' => DataContainer::MODE_TREE]]]));
     }
 
     public function testShowsAllOperationsAndDisablesLazyLoading(): void
@@ -98,10 +114,12 @@ class OperationVisibilityListenerTest extends TestCase
             'iconVisibilityDefault' => serialize(['show']),
         ]));
 
+        $listener('tl_page');
         $listener('tl_news');
 
-        $this->assertSame(['edit', 'copy', 'cut', 'show', 'articles', 'new'], $this->primary('tl_news'));
-        $this->assertFalse($GLOBALS['TL_DCA']['tl_news']['list']['lazyLoadOperations']);
+        $this->assertSame(['edit', 'copy', 'cut', 'show', 'articles', 'new'], $this->primary('tl_page'));
+        $this->assertSame(['edit', 'copy', 'cut', 'show', 'articles'], $this->primary('tl_news'));
+        $this->assertFalse($GLOBALS['TL_DCA']['tl_page']['list']['lazyLoadOperations']);
     }
 
     public function testRemembersTheOperationsContaoMarksAsPrimary(): void
