@@ -163,10 +163,13 @@ class OperationVisibilityListener implements ResetInterface
             return false;
         }
 
+        // Same conditions as BackendUser::setUserFromDb() for active groups.
+        $time = time() - time() % 60;
+
         return $this->allowOwn[(int) $user->id] ??= (bool) $this->connection->fetchOne(
-            'SELECT COUNT(*) FROM tl_user_group WHERE id IN (?) AND disable = 0 AND '.self::FIELD_ALLOW_OWN.' = 1',
-            [$groups],
-            [ArrayParameterType::INTEGER],
+            "SELECT COUNT(*) FROM tl_user_group WHERE id IN (:ids) AND disable = 0 AND (start = '' OR start <= :time) AND (stop = '' OR stop > :time) AND ".self::FIELD_ALLOW_OWN.' = 1',
+            ['ids' => $groups, 'time' => $time],
+            ['ids' => ArrayParameterType::INTEGER],
         );
     }
 

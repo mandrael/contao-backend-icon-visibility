@@ -30,26 +30,33 @@ class UserProfileListenerTest extends TestCase
         unset($GLOBALS['TL_DCA']);
     }
 
-    public function testHidesTheSelectionIfTheUserIsNotAllowed(): void
+    public function testLocksTheSelectionIfTheUserIsNotAllowed(): void
     {
-        $GLOBALS['TL_DCA']['tl_user']['palettes'] = ['login' => self::PALETTE, 'default' => self::PALETTE];
+        $GLOBALS['TL_DCA']['tl_user'] = [
+            'palettes' => ['__selector__' => ['admin', 'iconVisibilityOwn'], 'login' => self::PALETTE, 'default' => self::PALETTE],
+            'subpalettes' => ['iconVisibilityOwn' => 'iconVisibilityAll,iconVisibilityShow,iconVisibilityMenu'],
+            'fields' => ['iconVisibilityOwn' => ['exclude' => false]],
+        ];
 
-        $this->listener(null)->hideIfNotAllowed();
+        $this->listener(null)->lockIfNotAllowed();
 
-        $this->assertSame('{name_legend},name;{backend_legend},language;{password_legend},password', $GLOBALS['TL_DCA']['tl_user']['palettes']['login']);
-        $this->assertSame($GLOBALS['TL_DCA']['tl_user']['palettes']['login'], $GLOBALS['TL_DCA']['tl_user']['palettes']['default']);
+        $dca = $GLOBALS['TL_DCA']['tl_user'];
+
+        $this->assertSame('{name_legend},name;{backend_legend},language;{password_legend},password', $dca['palettes']['login']);
+        $this->assertSame($dca['palettes']['login'], $dca['palettes']['default']);
+        $this->assertSame(['admin'], $dca['palettes']['__selector__']);
+        $this->assertSame([], $dca['subpalettes']);
+        $this->assertTrue($dca['fields']['iconVisibilityOwn']['exclude']);
+        $this->assertTrue($dca['fields']['iconVisibilityMenu']['exclude']);
     }
 
     public function testKeepsTheSelectionForAdministrators(): void
     {
         $GLOBALS['TL_DCA']['tl_user']['palettes'] = ['login' => self::PALETTE];
 
-        $admin = $this->createStub(BackendUser::class);
-        $admin->method('__get')->willReturnCallback(static fn (string $key): mixed => 'isAdmin' === $key);
+        $this->listener(null, $this->user(7, true))->lockIfNotAllowed();
 
-        $this->listener(null, $admin)->hideIfNotAllowed();
-
-        $this->assertSame(self::PALETTE, $GLOBALS['TL_DCA']['tl_user']['palettes']['login']);
+        $this->assertSame(['login' => self::PALETTE], $GLOBALS['TL_DCA']['tl_user']['palettes']);
     }
 
     public function testPrefillsANewSelectionWithTheSettings(): void
@@ -58,24 +65,35 @@ class UserProfileListenerTest extends TestCase
         $connection
             ->expects($this->once())
             ->method('update')
-            ->with('tl_user', ['iconVisibilityAll' => 1, 'iconVisibilityShow' => 'a:1:{i:0;s:8:"all:show";}', 'iconVisibilityMenu' => null], ['id' => 7])
+            ->with('tl_user', ['iconVisibilityAll' => 1, 'iconVisibilityShow' => 'a:1:{i:0;s:8:"all:show";}', 'iconVisibilityMenu' => ''], ['id' => 7])
         ;
 
-        $listener = $this->listener($connection, null, ['iconVisibilityAll' => '1', 'iconVisibilityShow' => 'a:1:{i:0;s:8:"all:show";}']);
-
-        $this->assertSame('1', $listener->prefill('1', $this->dc(['iconVisibilityOwn' => false, 'iconVisibilityAll' => false, 'iconVisibilityShow' => null])));
+        $listener = $this->listener($connection, $this->user(7, true), ['iconVisibilityAll' => '1', 'iconVisibilityShow' => 'a:1:{i:0;s:8:"all:show";}']);
+        $listener->prefill($this->dc(7, ['iconVisibilityOwn' => true, 'iconVisibilityAll' => false, 'iconVisibilityShow' => null, 'iconVisibilityMenu' => null]));
     }
 
-    public function testKeepsAnExistingSelection(): void
+    public function testKeepsASavedSelectionEvenIfItIsEmpty(): void
     {
         $connection = $this->createMock(Connection::class);
         $connection->expects($this->never())->method('update');
 
-        $listener = $this->listener($connection);
+        $listener = $this->listener($connection, $this->user(7, true));
 
-        $listener->prefill('1', $this->dc(['iconVisibilityOwn' => false, 'iconVisibilityShow' => serialize(['page:cut'])]));
-        $listener->prefill('1', $this->dc(['iconVisibilityOwn' => true]));
-        $listener->prefill('', $this->dc([]));
+        $listener->prefill($this->dc(7, ['iconVisibilityOwn' => true, 'iconVisibilityShow' => '', 'iconVisibilityMenu' => null]));
+        $listener->prefill($this->dc(7, ['iconVisibilityOwn' => false, 'iconVisibilityShow' => null, 'iconVisibilityMenu' => null]));
+
+        // Another user's record or a user without permission.
+        $listener->prefill($this->dc(8, ['iconVisibilityOwn' => true, 'iconVisibilityShow' => null, 'iconVisibilityMenu' => null]));
+        $this->listener($connection)->prefill($this->dc(7, ['iconVisibilityOwn' => true, 'iconVisibilityShow' => null, 'iconVisibilityMenu' => null]));
+    }
+
+    public function testStoresAnEmptySelectionAsAnEmptyList(): void
+    {
+        $listener = $this->listener(null);
+
+        $this->assertSame('a:0:{}', $listener->keepEmptySelection(''));
+        $this->assertSame('a:0:{}', $listener->keepEmptySelection(null));
+        $this->assertSame('a:1:{i:0;s:8:"page:cut";}', $listener->keepEmptySelection('a:1:{i:0;s:8:"page:cut";}'));
     }
 
     /**
@@ -91,12 +109,20 @@ class UserProfileListenerTest extends TestCase
     /**
      * @param array<string, mixed> $record
      */
-    private function dc(array $record): DataContainer
+    private function dc(int $id, array $record): DataContainer
     {
         $dc = $this->createStub(DataContainer::class);
         $dc->method('getCurrentRecord')->willReturn($record);
-        $dc->method('__get')->willReturnMap([['id', 7]]);
+        $dc->method('__get')->willReturnMap([['id', $id]]);
 
         return $dc;
+    }
+
+    private function user(int $id, bool $admin): BackendUser
+    {
+        $user = $this->createStub(BackendUser::class);
+        $user->method('__get')->willReturnCallback(static fn (string $key): mixed => ['id' => $id, 'isAdmin' => $admin][$key] ?? null);
+
+        return $user;
     }
 }
