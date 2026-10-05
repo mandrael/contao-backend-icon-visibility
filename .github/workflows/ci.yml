@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Contao ${{ matrix.contao }}, PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - contao: '5.7'
+            php: '8.3'
+          - contao: '5.7'
+            php: '8.4'
+          - contao: '6.0'
+            php: '8.4'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - name: composer validate
+        run: composer validate --no-check-publish --strict
+      - name: Select the Contao version
+        run: composer require "contao/core-bundle:${{ matrix.contao }}.*" --no-update --no-interaction
+      - name: Install dependencies
+        run: composer update --no-interaction --no-progress --prefer-dist
+      - name: Installed Contao version
+        run: composer show contao/core-bundle | grep -E '^versions'
+      - name: PHPUnit
+        run: vendor/bin/phpunit
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --no-progress

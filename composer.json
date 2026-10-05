@@ -1,0 +1,62 @@
+{
+    "name": "mandrael/contao-backend-icon-visibility",
+    "type": "contao-bundle",
+    "description": "Choose which record icons (copy, move, delete, info, versions, ...) stay visible in the Contao back end list views instead of the \"...\" menu, per area or for all lists.",
+    "keywords": ["contao", "backend", "icons", "operations", "context menu", "list view"],
+    "homepage": "https://github.com/mandrael/contao-backend-icon-visibility",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Michael Gasperl",
+            "email": "michael@gasperl.at",
+            "homepage": "https://github.com/mandrael",
+            "role": "Maintainer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/mandrael/contao-backend-icon-visibility/issues",
+        "source": "https://github.com/mandrael/contao-backend-icon-visibility"
+    },
+    "require": {
+        "php": "^8.3",
+        "contao/core-bundle": "^5.7 || ^6.0",
+        "symfony/config": "^7.4 || ^8.0",
+        "symfony/dependency-injection": "^7.4 || ^8.0",
+        "symfony/http-kernel": "^7.4 || ^8.0"
+    },
+    "require-dev": {
+        "contao/manager-plugin": "^2.0",
+        "phpunit/phpunit": "^11.5 || ^12.4",
+        "phpstan/phpstan": "^2.0"
+    },
+    "conflict": {
+        "contao/manager-plugin": "<2.0 || >=3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Mandrael\\ContaoBackendIconVisibilityBundle\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Mandrael\\ContaoBackendIconVisibilityBundle\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "contao/manager-plugin": true,
+            "contao-components/installer": true,
+            "php-http/discovery": false
+        }
+    },
+    "extra": {
+        "contao-manager-plugin": "Mandrael\\ContaoBackendIconVisibilityBundle\\ContaoManager\\Plugin"
+    },
+    "scripts": {
+        "gate": [
+            "@composer validate --strict",
+            "phpunit",
+            "phpstan analyse --no-progress"
+        ]
+    }
+}
