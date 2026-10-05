@@ -8,3 +8,5 @@ services:
         exclude:
             - '../src/MandraelContaoBackendIconVisibilityBundle.php'
             - '../src/ContaoManager/'
+            - '../src/DataContainer/'
+            - '../src/DependencyInjection/'

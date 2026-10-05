@@ -11,7 +11,7 @@ This bundle lets you choose in the system settings which icons stay visible in t
 - **Show all icons:** every list shows all icons in the row and the "..." menu disappears. Large site structures then load all icons right away as well.
 - **Show in the row:** first "In all lists" for icons that should be visible in every list that has them, for example "Details". This includes lists of other extensions. Below, ten areas add to the selection for their lists: pages, articles, content elements, news, events, FAQ, newsletters and recipients, forms and form fields, files, members.
 - **Keep in the "..." menu:** built the same way and takes precedence. This allows, for example, "details everywhere except for members" or "all icons as in Contao 5.3, only delete stays in the menu".
-- **New after/into:** the buttons that create a record after or inside another one can be shown as icons too.
+- **New after/into:** the buttons that create a record after or inside another one can be shown as icons too. To tell them apart in the row, they get their own icons: the green plus in a circle, open at the bottom ("new after") or on the right ("new into"). An icon set by an extension is kept.
 - **Own selection per user:** a user group can be set to "Allow own icon selection". Its members can then switch on their own selection in their profile, which replaces the system settings. It is prefilled with them when switched on and only shows areas whose back end modules the user may access. Administrators always may.
 - Only icons that actually exist in the respective list can be selected, labelled as Contao labels them. Areas of extensions that are not installed (such as news or FAQ) are left out.
 

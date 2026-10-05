@@ -12,12 +12,26 @@ declare(strict_types=1);
 
 namespace Mandrael\ContaoBackendIconVisibilityBundle;
 
+use Mandrael\ContaoBackendIconVisibilityBundle\DependencyInjection\Compiler\OperationsBuilderPass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 
 class MandraelContaoBackendIconVisibilityBundle extends AbstractBundle
 {
+    /**
+     * The bundle root, so public/ (icons) and contao/ are found next to src/.
+     */
+    public function getPath(): string
+    {
+        return \dirname(__DIR__);
+    }
+
+    public function build(ContainerBuilder $container): void
+    {
+        $container->addCompilerPass(new OperationsBuilderPass());
+    }
+
     /**
      * @param array<mixed> $config
      */
