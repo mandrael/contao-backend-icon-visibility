@@ -12,13 +12,14 @@ declare(strict_types=1);
 
 namespace Mandrael\ContaoBackendIconVisibilityBundle\EventListener;
 
+use Contao\Config;
 use Contao\Controller;
 use Contao\CoreBundle\DependencyInjection\Attribute\AsCallback;
 use Contao\CoreBundle\Framework\ContaoFramework;
 use Contao\CoreBundle\Security\ContaoCorePermissions;
 use Contao\Image;
-use Mandrael\ContaoBackendIconVisibilityBundle\DataContainer\OperationsBuilder;
 use Contao\System;
+use Mandrael\ContaoBackendIconVisibilityBundle\DataContainer\OperationsBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
@@ -62,6 +63,23 @@ class SelectionOptionsListener
         $label[0] = \sprintf($label[0], ...$icons);
         unset($GLOBALS['TL_DCA']['tl_settings']['fields'][$field]['label']);
         $GLOBALS['TL_DCA']['tl_settings']['fields'][$field]['label'] = $label;
+    }
+
+    /**
+     * Contao writes the settings only when the request ends, after the
+     * redirect was sent. A fast browser then shows the old values, and saving
+     * again stores them. Write the file before the redirect instead.
+     */
+    #[AsCallback('tl_settings', 'config.onsubmit', priority: -100)]
+    public function saveSettingsNow(): void
+    {
+        $config = $this->framework->getAdapter(Config::class);
+        $field = OperationVisibilityListener::FIELD_ALL;
+
+        // persist() loads the file before changing it; save() would otherwise
+        // write an empty file if nothing was changed in this request.
+        $config->persist($field, (bool) $config->get($field));
+        Config::getInstance()->save();
     }
 
     /**
