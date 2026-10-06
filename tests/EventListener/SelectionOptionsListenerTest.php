@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 namespace Mandrael\ContaoBackendIconVisibilityBundle\Tests\EventListener;
 
+use Contao\CoreBundle\Framework\Adapter;
+use Contao\CoreBundle\Framework\ContaoFramework;
 use Contao\DataContainer;
 use Contao\DC_Folder;
 use Contao\DC_Table;
@@ -194,6 +196,21 @@ class SelectionOptionsListenerTest extends TestCase
         $this->listener->addIconPreview();
 
         $this->assertSame('Own icons %s %s %s', $GLOBALS['TL_DCA']['tl_settings']['fields']['iconVisibilityNewIcons']['label'][0]);
+    }
+
+    public function testShowsNewAfterBeforeNewInto(): void
+    {
+        $GLOBALS['TL_LANG']['MSC']['iconVisibilityNewIcons'] = ['%s|%s', ''];
+        $GLOBALS['TL_DCA']['tl_settings']['fields']['iconVisibilityNewIcons'] = [];
+
+        $image = $this->createStub(Adapter::class);
+        $image->method('__call')->willReturnCallback(static fn (string $method, array $args): string => $args[0]);
+        $framework = $this->createStub(ContaoFramework::class);
+        $framework->method('getAdapter')->willReturn($image);
+
+        (new SelectionOptionsListener($framework, $this->visibility, $this->mockSecurity()))->addIconPreview();
+
+        $this->assertSame(OperationVisibilityListener::NEW_ICONS['after'].'|'.OperationVisibilityListener::NEW_ICONS['into'], $GLOBALS['TL_DCA']['tl_settings']['fields']['iconVisibilityNewIcons']['label'][0]);
     }
 
     public function testRemovesTheOptInIfTheOwnIconsAreNotAvailable(): void
