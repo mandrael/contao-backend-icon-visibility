@@ -25,9 +25,12 @@ class LanguageFilesTest extends TestCase
         $this->assertSame($this->keys($de), $this->keys($en));
 
         foreach (['de' => $de, 'en' => $en] as $language => $lang) {
-            foreach ([OperationVisibilityListener::FIELD_ALL, OperationVisibilityListener::FIELD_SHOW, OperationVisibilityListener::FIELD_MENU] as $field) {
+            foreach ([OperationVisibilityListener::FIELD_ALL, OperationVisibilityListener::FIELD_NEW_ICONS, OperationVisibilityListener::FIELD_SHOW, OperationVisibilityListener::FIELD_MENU] as $field) {
                 $this->assertCount(2, $lang['MSC'][$field] ?? [], "$language: label for $field is missing");
             }
+
+            // One placeholder per icon, see SelectionOptionsListener::addIconPreview().
+            $this->assertSame(2, substr_count($lang['MSC'][OperationVisibilityListener::FIELD_NEW_ICONS][0], '%s'));
 
             $this->assertCount(2, $lang['tl_user'][OperationVisibilityListener::FIELD_OWN] ?? [], "$language: profile label is missing");
             $this->assertCount(2, $lang['tl_user_group'][OperationVisibilityListener::FIELD_ALLOW_OWN] ?? [], "$language: group label is missing");

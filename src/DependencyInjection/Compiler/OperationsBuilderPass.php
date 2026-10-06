@@ -25,8 +25,15 @@ class OperationsBuilderPass implements CompilerPassInterface
 {
     public const SERVICE = 'contao.data_container.operations_builder';
 
+    /**
+     * Whether the own icons are available (offered in the settings).
+     */
+    public const PARAMETER = 'mandrael_contao_backend_icon_visibility.own_icons';
+
     public function process(ContainerBuilder $container): void
     {
+        $container->setParameter(self::PARAMETER, false);
+
         if (!$container->hasDefinition(self::SERVICE) || !self::isCompatible()) {
             return;
         }
@@ -35,6 +42,7 @@ class OperationsBuilderPass implements CompilerPassInterface
 
         if (DataContainerOperationsBuilder::class === $definition->getClass()) {
             $definition->setClass(OperationsBuilder::class);
+            $container->setParameter(self::PARAMETER, true);
         }
     }
 

@@ -91,6 +91,14 @@ class OperationVisibilityListener implements ResetInterface
     public const NEW_MARKER = 'iconVisibilityMarked';
 
     /**
+     * Own icons of "new after" and "new into" (see DataContainer\OperationsBuilder).
+     */
+    public const NEW_ICONS = [
+        'after' => 'bundles/mandraelcontaobackendiconvisibility/icons/new-after.svg',
+        'into' => 'bundles/mandraelcontaobackendiconvisibility/icons/new-into.svg',
+    ];
+
+    /**
      * Operations Contao itself marks as primary, per table (always visible).
      *
      * @var array<string, list<string>>

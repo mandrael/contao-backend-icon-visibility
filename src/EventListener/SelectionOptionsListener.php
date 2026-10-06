@@ -19,8 +19,9 @@ use Contao\CoreBundle\Framework\ContaoFramework;
 use Contao\CoreBundle\Security\ContaoCorePermissions;
 use Contao\Image;
 use Contao\System;
-use Mandrael\ContaoBackendIconVisibilityBundle\DataContainer\OperationsBuilder;
+use Mandrael\ContaoBackendIconVisibilityBundle\DependencyInjection\Compiler\OperationsBuilderPass;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Builds the grouped checkbox options of the selection fields: first the group
@@ -39,16 +40,26 @@ class SelectionOptionsListener
         private readonly ContaoFramework $framework,
         private readonly OperationVisibilityListener $visibility,
         private readonly Security $security,
+        #[Autowire(param: OperationsBuilderPass::PARAMETER)]
+        private readonly bool $ownIcons = true,
     ) {
     }
 
     /**
-     * Shows the two icons in the label of the opt-in.
+     * Shows the two icons in the label of the opt-in, or removes the opt-in if
+     * Contao's operations builder could not be replaced.
      */
     #[AsCallback('tl_settings', 'config.onload')]
     public function addIconPreview(): void
     {
         $field = OperationVisibilityListener::FIELD_NEW_ICONS;
+
+        if (!$this->ownIcons) {
+            $GLOBALS['TL_DCA']['tl_settings']['palettes']['default'] = str_replace(','.$field, '', $GLOBALS['TL_DCA']['tl_settings']['palettes']['default'] ?? '');
+
+            return;
+        }
+
         $label = $GLOBALS['TL_LANG']['MSC'][$field] ?? null;
 
         if (!\is_array($label) || !isset($label[0])) {
@@ -56,30 +67,47 @@ class SelectionOptionsListener
         }
 
         $image = $this->framework->getAdapter(Image::class);
-        $icons = array_map(static fn (string $icon): string => (string) $image->getHtml($icon), array_values(OperationsBuilder::ICONS));
+        $icons = array_map(static fn (string $icon): string => (string) $image->getHtml($icon), array_values(OperationVisibilityListener::NEW_ICONS));
+
+        try {
+            $label[0] = \sprintf($label[0], ...$icons);
+        } catch (\ArgumentCountError|\ValueError) {
+            // A customized label without two placeholders stays as it is.
+        }
 
         // The DCA label is a reference to the language array: break it, so
         // the language string itself stays unchanged.
-        $label[0] = \sprintf($label[0], ...$icons);
         unset($GLOBALS['TL_DCA']['tl_settings']['fields'][$field]['label']);
         $GLOBALS['TL_DCA']['tl_settings']['fields'][$field]['label'] = $label;
     }
 
     /**
-     * Contao writes the settings only when the request ends, after the
+     * Contao writes changed settings only when the request ends, after the
      * redirect was sent. A fast browser then shows the old values, and saving
-     * again stores them. Write the file before the redirect instead.
+     * again stores them. Write them before the redirect instead, but only if
+     * Contao would write them anyway.
      */
-    #[AsCallback('tl_settings', 'config.onsubmit', priority: -100)]
+    #[AsCallback('tl_settings', 'config.onsubmit', priority: -1000)]
     public function saveSettingsNow(): void
     {
-        $config = $this->framework->getAdapter(Config::class);
-        $field = OperationVisibilityListener::FIELD_ALL;
+        $config = $this->framework->getAdapter(Config::class)->getInstance();
 
-        // persist() loads the file before changing it; save() would otherwise
-        // write an empty file if nothing was changed in this request.
-        $config->persist($field, (bool) $config->get($field));
-        Config::getInstance()->save();
+        // Contao keeps the flag internal; without it, leave everything to Contao.
+        try {
+            $modified = (new \ReflectionProperty($config, 'blnIsModified'))->getValue($config);
+        } catch (\ReflectionException) {
+            return;
+        }
+
+        if (!$modified) {
+            return;
+        }
+
+        try {
+            $config->save();
+        } catch (\Throwable) {
+            // Contao tries again when the request ends, as without this bundle.
+        }
     }
 
     /**

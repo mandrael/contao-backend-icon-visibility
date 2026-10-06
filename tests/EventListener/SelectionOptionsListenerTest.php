@@ -178,4 +178,30 @@ class SelectionOptionsListenerTest extends TestCase
         );
         $this->assertSame(['files:copy' => 'Duplicate', 'files:show' => 'Details'], $options['Files']);
     }
+
+    public function testShowsTheIconsInTheLabelOfTheOptIn(): void
+    {
+        $GLOBALS['TL_LANG']['MSC']['iconVisibilityNewIcons'] = ['Own icons: %s, %s', 'Help'];
+        $GLOBALS['TL_DCA']['tl_settings'] = ['palettes' => ['default' => '{a},iconVisibilityAll,iconVisibilityNewIcons'], 'fields' => ['iconVisibilityNewIcons' => ['label' => &$GLOBALS['TL_LANG']['MSC']['iconVisibilityNewIcons']]]];
+
+        $this->listener->addIconPreview();
+
+        $this->assertSame(['Own icons: , ', 'Help'], $GLOBALS['TL_DCA']['tl_settings']['fields']['iconVisibilityNewIcons']['label']);
+        $this->assertSame('Own icons: %s, %s', $GLOBALS['TL_LANG']['MSC']['iconVisibilityNewIcons'][0], 'the language string must stay unchanged');
+
+        // A customized label with more placeholders than icons stays as it is.
+        $GLOBALS['TL_LANG']['MSC']['iconVisibilityNewIcons'] = ['Own icons %s %s %s', 'Help'];
+        $this->listener->addIconPreview();
+
+        $this->assertSame('Own icons %s %s %s', $GLOBALS['TL_DCA']['tl_settings']['fields']['iconVisibilityNewIcons']['label'][0]);
+    }
+
+    public function testRemovesTheOptInIfTheOwnIconsAreNotAvailable(): void
+    {
+        $GLOBALS['TL_DCA']['tl_settings'] = ['palettes' => ['default' => '{a},iconVisibilityAll,iconVisibilityNewIcons,iconVisibilityShow']];
+
+        (new SelectionOptionsListener($this->mockFramework(), $this->visibility, $this->mockSecurity(), false))->addIconPreview();
+
+        $this->assertSame('{a},iconVisibilityAll,iconVisibilityShow', $GLOBALS['TL_DCA']['tl_settings']['palettes']['default']);
+    }
 }

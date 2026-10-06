@@ -26,8 +26,8 @@ use Mandrael\ContaoBackendIconVisibilityBundle\EventListener\OperationVisibility
 class OperationsBuilder extends DataContainerOperationsBuilder
 {
     public const ICONS = [
-        self::CREATE_AFTER => 'bundles/mandraelcontaobackendiconvisibility/icons/new-after.svg',
-        self::CREATE_INTO => 'bundles/mandraelcontaobackendiconvisibility/icons/new-into.svg',
+        self::CREATE_AFTER => OperationVisibilityListener::NEW_ICONS['after'],
+        self::CREATE_INTO => OperationVisibilityListener::NEW_ICONS['into'],
     ];
 
     public function addNewButton(string $mode, string $table, int $pid, int|null $id = null): DataContainerOperationsBuilder

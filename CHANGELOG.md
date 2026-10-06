@@ -14,3 +14,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Selectable "new after/into" buttons in the site structure and in parent views, optionally with distinct icons (circle open at the bottom or on the right, setting "Own icons").
 - Own selection in the user profile, replacing the system settings; allowed per user group ("Allow own icon selection") and always for administrators. Prefilled with the system settings and limited to the areas of the user's back end modules.
 - The options are built from the operations that actually exist in the respective list.
+
+### Fixed
+
+- The system settings no longer show outdated values right after saving: Contao writes them only after the redirect, so saving again stored the old values. Changed settings are now written before the redirect.
