@@ -14,6 +14,7 @@ namespace Mandrael\ContaoBackendIconVisibilityBundle\EventListener;
 
 use Contao\Config;
 use Contao\Controller;
+use Contao\CoreBundle\DataContainer\PaletteManipulator;
 use Contao\CoreBundle\DependencyInjection\Attribute\AsCallback;
 use Contao\CoreBundle\Framework\ContaoFramework;
 use Contao\CoreBundle\Security\ContaoCorePermissions;
@@ -55,7 +56,7 @@ class SelectionOptionsListener
         $field = OperationVisibilityListener::FIELD_NEW_ICONS;
 
         if (!$this->ownIcons) {
-            $GLOBALS['TL_DCA']['tl_settings']['palettes']['default'] = str_replace(','.$field, '', $GLOBALS['TL_DCA']['tl_settings']['palettes']['default'] ?? '');
+            PaletteManipulator::create()->removeField($field)->applyToPalette('default', 'tl_settings');
 
             return;
         }

@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 namespace Mandrael\ContaoBackendIconVisibilityBundle\Tests\EventListener;
 
+use Contao\Config;
 use Contao\CoreBundle\Framework\Adapter;
 use Contao\CoreBundle\Framework\ContaoFramework;
 use Contao\DataContainer;
@@ -215,10 +216,48 @@ class SelectionOptionsListenerTest extends TestCase
 
     public function testRemovesTheOptInIfTheOwnIconsAreNotAvailable(): void
     {
-        $GLOBALS['TL_DCA']['tl_settings'] = ['palettes' => ['default' => '{a},iconVisibilityAll,iconVisibilityNewIcons,iconVisibilityShow']];
+        $GLOBALS['TL_DCA']['tl_settings'] = ['palettes' => ['default' => '{a_legend},iconVisibilityNewIcons,iconVisibilityAll;{b_legend},iconVisibilityShow']];
 
         (new SelectionOptionsListener($this->mockFramework(), $this->visibility, $this->mockSecurity(), false))->addIconPreview();
 
-        $this->assertSame('{a},iconVisibilityAll,iconVisibilityShow', $GLOBALS['TL_DCA']['tl_settings']['palettes']['default']);
+        $this->assertSame('{a_legend},iconVisibilityAll;{b_legend},iconVisibilityShow', $GLOBALS['TL_DCA']['tl_settings']['palettes']['default']);
+    }
+
+    public function testSavesTheSettingsBeforeTheRedirectOnlyIfContaoWouldSaveThem(): void
+    {
+        foreach ([[false, false, 0], [true, false, 1], [true, true, 1]] as [$modified, $fails, $calls]) {
+            $config = new class($modified, $fails) extends Config {
+                public int $calls = 0;
+
+                public function __construct(bool $modified, private readonly bool $fails)
+                {
+                    $this->blnIsModified = $modified;
+                }
+
+                public function save(): void
+                {
+                    ++$this->calls;
+
+                    if ($this->fails) {
+                        throw new \RuntimeException('not writable');
+                    }
+
+                    $this->blnIsModified = false;
+                }
+            };
+
+            $adapter = $this->createStub(Adapter::class);
+            $adapter->method('__call')->willReturn($config);
+            $framework = $this->createStub(ContaoFramework::class);
+            $framework->method('getAdapter')->willReturn($adapter);
+
+            // A failed write is left to Contao, which tries again when the request ends.
+            (new SelectionOptionsListener($framework, $this->visibility, $this->mockSecurity()))->saveSettingsNow();
+
+            $this->assertSame($calls, $config->calls);
+
+            // Avoid the retry in Config::__destruct() when the test ends.
+            (new \ReflectionProperty(Config::class, 'blnIsModified'))->setValue($config, false);
+        }
     }
 }
