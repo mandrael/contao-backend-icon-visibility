@@ -42,6 +42,11 @@ class OperationVisibilityListener implements ResetInterface
     public const FIELD_MENU = 'iconVisibilityMenu';
 
     /**
+     * Setting: distinct icons for "new after" and "new into" (opt-in).
+     */
+    public const FIELD_NEW_ICONS = 'iconVisibilityNewIcons';
+
+    /**
      * Profile switch: use the user's own selection instead of the settings.
      */
     public const FIELD_OWN = 'iconVisibilityOwn';
@@ -261,7 +266,10 @@ class OperationVisibilityListener implements ResetInterface
 
         if (null === $new || \is_array($new)) {
             $GLOBALS['TL_DCA'][$table]['list']['operations'][self::NEW]['primary'] = true;
-            $GLOBALS['TL_DCA'][$table]['list']['operations'][self::NEW][self::NEW_MARKER] = true;
+
+            if ($this->framework->getAdapter(Config::class)->get(self::FIELD_NEW_ICONS)) {
+                $GLOBALS['TL_DCA'][$table]['list']['operations'][self::NEW][self::NEW_MARKER] = true;
+            }
         }
     }
 

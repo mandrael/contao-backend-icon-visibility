@@ -112,7 +112,7 @@ class OperationVisibilityListenerTest extends TestCase
 
     public function testMarksTheNewButtonsOnlyWhereContaoRendersThem(): void
     {
-        $listener = $this->visibility(['iconVisibilityShow' => serialize(['all:new'])]);
+        $listener = $this->visibility(['iconVisibilityShow' => serialize(['all:new']), 'iconVisibilityNewIcons' => '1']);
 
         $listener('tl_page');
         $listener('tl_news');
@@ -122,6 +122,14 @@ class OperationVisibilityListenerTest extends TestCase
 
         // A parent view sorted by date has no "new after" buttons.
         $this->assertArrayNotHasKey('new', $GLOBALS['TL_DCA']['tl_news']['list']['operations']);
+    }
+
+    public function testUsesOwnNewIconsOnlyWhenEnabled(): void
+    {
+        ($this->visibility(['iconVisibilityShow' => serialize(['all:new'])]))('tl_page');
+
+        $this->assertTrue($GLOBALS['TL_DCA']['tl_page']['list']['operations']['new']['primary']);
+        $this->assertArrayNotHasKey(OperationVisibilityListener::NEW_MARKER, $GLOBALS['TL_DCA']['tl_page']['list']['operations']['new']);
     }
 
     public function testDetectsListsWithNewButtons(): void

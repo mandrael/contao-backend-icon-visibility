@@ -16,6 +16,8 @@ use Contao\Controller;
 use Contao\CoreBundle\DependencyInjection\Attribute\AsCallback;
 use Contao\CoreBundle\Framework\ContaoFramework;
 use Contao\CoreBundle\Security\ContaoCorePermissions;
+use Contao\Image;
+use Mandrael\ContaoBackendIconVisibilityBundle\DataContainer\OperationsBuilder;
 use Contao\System;
 use Symfony\Bundle\SecurityBundle\Security;
 
@@ -37,6 +39,29 @@ class SelectionOptionsListener
         private readonly OperationVisibilityListener $visibility,
         private readonly Security $security,
     ) {
+    }
+
+    /**
+     * Shows the two icons in the label of the opt-in.
+     */
+    #[AsCallback('tl_settings', 'config.onload')]
+    public function addIconPreview(): void
+    {
+        $field = OperationVisibilityListener::FIELD_NEW_ICONS;
+        $label = $GLOBALS['TL_LANG']['MSC'][$field] ?? null;
+
+        if (!\is_array($label) || !isset($label[0])) {
+            return;
+        }
+
+        $image = $this->framework->getAdapter(Image::class);
+        $icons = array_map(static fn (string $icon): string => (string) $image->getHtml($icon), array_values(OperationsBuilder::ICONS));
+
+        // The DCA label is a reference to the language array: break it, so
+        // the language string itself stays unchanged.
+        $label[0] = \sprintf($label[0], ...$icons);
+        unset($GLOBALS['TL_DCA']['tl_settings']['fields'][$field]['label']);
+        $GLOBALS['TL_DCA']['tl_settings']['fields'][$field]['label'] = $label;
     }
 
     /**

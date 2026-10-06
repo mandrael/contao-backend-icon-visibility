@@ -16,7 +16,13 @@ use Mandrael\ContaoBackendIconVisibilityBundle\EventListener\OperationVisibility
 $GLOBALS['TL_DCA']['tl_settings']['fields'][OperationVisibilityListener::FIELD_ALL] = [
     'label' => &$GLOBALS['TL_LANG']['MSC'][OperationVisibilityListener::FIELD_ALL],
     'inputType' => 'checkbox',
-    'eval' => ['tl_class' => 'clr'],
+    'eval' => ['tl_class' => 'w50 clr'],
+];
+
+$GLOBALS['TL_DCA']['tl_settings']['fields'][OperationVisibilityListener::FIELD_NEW_ICONS] = [
+    'label' => &$GLOBALS['TL_LANG']['MSC'][OperationVisibilityListener::FIELD_NEW_ICONS],
+    'inputType' => 'checkbox',
+    'eval' => ['tl_class' => 'w50'],
 ];
 
 foreach ([OperationVisibilityListener::FIELD_SHOW, OperationVisibilityListener::FIELD_MENU] as $field) {
@@ -29,7 +35,7 @@ foreach ([OperationVisibilityListener::FIELD_SHOW, OperationVisibilityListener::
 
 PaletteManipulator::create()
     ->addLegend('icon_visibility_legend', 'backend_legend', PaletteManipulator::POSITION_AFTER, true)
-    ->addField([OperationVisibilityListener::FIELD_ALL, OperationVisibilityListener::FIELD_SHOW, OperationVisibilityListener::FIELD_MENU], 'icon_visibility_legend', PaletteManipulator::POSITION_APPEND)
+    ->addField([OperationVisibilityListener::FIELD_ALL, OperationVisibilityListener::FIELD_NEW_ICONS, OperationVisibilityListener::FIELD_SHOW, OperationVisibilityListener::FIELD_MENU], 'icon_visibility_legend', PaletteManipulator::POSITION_APPEND)
     ->applyToPalette('default', 'tl_settings')
 ;
 
